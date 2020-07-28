@@ -2,14 +2,22 @@
 #include <QtDebug>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QScrollArea>
 #include "LabelRow.hpp"
+#include "mcl.hpp"
 
 MclWindow::MclWindow(QWidget *parent) : QWidget(parent)
 {
     initWindow();
 }
 
+void MclWindow::mclUpdated(const MclWidget::GeometryTraverse &g)
+{
+    const QPointF &cc = g.pmap.at(g.tree.current);
+    mclScroll->ensureVisible(cc.x(), cc.y());
+    nextItButton->setDisabled(MclTree::isTarget(g.tree.current));
+    prevItButton->setDisabled(g.tree.current == g.tree.root);
+}
+ 
 void MclWindow::initWindow()
 {
     initLayout();
@@ -28,12 +36,10 @@ void MclWindow::addWidgets()
 {
     addInfoWidgets();
     addButtons();
+    mclScroll = QSharedPointer<QScrollArea>(new QScrollArea());
     mcl = QSharedPointer<MclWidget>(new MclWidget());
-    QHBoxLayout *layout = new QHBoxLayout();
-    layout->addWidget(mcl.get(), 1);
-    QScrollArea *scrollArea = new QScrollArea();
-    scrollArea->setLayout(layout);
-    mainBox->addWidget(scrollArea, 1);
+    mclScroll->setWidget(mcl.get());
+    mainBox->addWidget(mclScroll.get(), 1);
 }
 
 void MclWindow::addInfoWidgets()
@@ -83,4 +89,6 @@ void MclWindow::initSignals()
             SLOT(nextIteration()));
     connect(prevItButton.get(), SIGNAL(clicked()), mcl.get(),
             SLOT(previousIteration()));
+    connect(mcl.get(), SIGNAL(treeUpdate(const MclWidget::GeometryTraverse&)),
+            this, SLOT(mclUpdated(const MclWidget::GeometryTraverse&)));
 }

@@ -1,25 +1,15 @@
 #include "MclWidget.hpp"
 #include <string>
 #include <cmath>
-#include <vector>
-#include <unordered_map>
 #include <algorithm>
-#include <iterator>
+#include <functional>
+#include <memory>
 #include <QtDebug>
+#include <QMouseEvent>
 
 void MclWidget::paintNode(const MclNode *node, QPainter &painter, 
-                          const QPointF &center, bool highlight)
+                          const QPointF &center, QString const rtag)
 {
-    static double const nodeWidth = nodeRect.width();
-    static double const nodeHeight = nodeRect.height();
-
-    QPen ppen(painter.pen());
-    if (highlight) {
-        QPen hpen(ppen);
-        hpen.setColor(QColor("darkred"));
-        painter.setPen(hpen);
-    }
-
     QString text = QString::fromStdString(*node);
     QString vhText = QString::number(node->vh());
     QRectF rect = nodeRect;
@@ -28,21 +18,24 @@ void MclWidget::paintNode(const MclNode *node, QPainter &painter,
     painter.drawText(rect, Qt::AlignCenter, text);
 
     QFont pfont(painter.font());
-    QFont vhFont;
-    vhFont.setPointSize(8);
-    painter.setFont(vhFont);
+    QFont tagFont;
+    tagFont.setPointSize(8);
+    painter.setFont(tagFont);
     int vhWidth = painter.fontMetrics().size(0, vhText).width();
     QRectF vhRect = rect.translated(-vhWidth - 5, 0);
     painter.drawText(vhRect, Qt::AlignLeft | Qt::AlignVCenter, vhText);
-    painter.setFont(pfont);
-
-    if (highlight) {
-        painter.setPen(ppen);
+    
+    if (rtag.size() > 0) {
+        int rtagWidth = painter.fontMetrics().size(0, rtag).width();
+        QRectF rtagRect = rect.translated(rtagWidth + 5, 0);
+        painter.drawText(rtagRect, Qt::AlignRight | Qt::AlignVCenter, rtag);
     }
+
+    painter.setFont(pfont);
 }
 
 void MclWidget::paintEdge(QPainter &painter, const QPointF &c1,
-                          const QPointF &c2, bool highlight)
+                          const QPointF &c2)
 {
     using std::sqrt;
     using std::pow;
@@ -67,83 +60,333 @@ void MclWidget::paintEdge(QPainter &painter, const QPointF &c1,
     double ey1 = m * (ex1 - x1) + y1;
     double ex2 = x2 - sgn * k;
     double ey2 = m * (ex2 - x2) + y2;
-
-    QPen ppen(painter.pen());
-    if (highlight) {
-        QPen hpen(ppen);
-        hpen.setColor(QColor("darkred"));
-        painter.setPen(hpen);
-    }
     painter.drawLine(QPointF(ex1, ey1), QPointF(ex2, ey2));
-    if (highlight) {
+}
+
+MclWidget::GeometryTraverse::GeometryTraverse(const MclTree &t)
+    : tree{t}, depth{0}
+{
+    QPointF nullPoint;
+    pmap[tree.root] = nullPoint;
+    QRectF rect = nodeRect;
+    rect.moveCenter(nullPoint);
+    leftmost = rect;
+    rightmost = rect;
+}
+
+void MclWidget::GeometryTraverse::operator()(const MclNode *node)
+{
+    using namespace std::placeholders;
+
+    MclNode *node_ = const_cast<MclNode*>(node);
+    if (node->depth > depth) {
+        depth = node->depth;
+    }
+
+    if (!tree.treeContains(node) || !(node->ccount > 0)) {
+        return;
+    }
+
+    MclTree::Nodes children;
+    for (const auto &c : node->children) {
+        if (tree.treeContains(c.get())) {
+            children.push_back(c.get());
+        }
+    }
+
+    int ccount = children.size();
+    if (!(ccount > 0)) {
+        return;
+    }
+
+    const auto &center = pmap[node_];
+    double childrenWidth = nodeWidth * ccount + hMargin * (ccount - 1);
+    double crx = center.x() - childrenWidth / 2;
+    double cry = center.y() + nodeHeight / 2 + vMargin;
+    QRectF rect(crx, cry, childrenWidth, nodeHeight);
+    QPointF rcenter = rect.center();
+    MclTree::Nodes leftNodes;
+    MclTree::Nodes rightNodes;
+    double ldelta = 0;
+    double rdelta = 0;
+
+    for (const auto &entry : rmap) {
+        const auto &n = entry.first;
+        if (n->depth != node->depth) {
+            continue;
+        }
+
+        const auto &r = entry.second;
+        auto rc = r.center();
+        bool atLeft = rc.x() < rcenter.x();
+
+        if (atLeft) {
+            leftNodes.push_back(n);
+        } else {
+            rightNodes.push_back(n);
+        }
+
+        if (!r.intersects(rect)) {
+            continue;
+        }
+
+        if (atLeft) {
+            double delta = r.right() - rect.left() + hMargin;
+            if (delta > ldelta) {
+                ldelta = delta;
+            }
+        } else {
+            double delta = rect.right() - r.left() + hMargin;
+            if (delta > rdelta) {
+                rdelta = delta;
+            }
+        }
+    }
+
+    auto cfunc = [this](double delta, const std::unique_ptr<MclNode> &c) {
+        if (tree.treeContains(c.get())) {
+            pmap.at(c.get()).rx() += delta;
+        }
+    };
+
+    if (ldelta > 0) {
+        auto lcomp = [this](MclNode *n1, MclNode *n2) {
+            return rmap.at(n1).x() > rmap.at(n2).x();
+        };
+        std::sort(leftNodes.begin(), leftNodes.end(), lcomp);
+
+        auto it = leftNodes.cbegin();
+        while (true) {
+            auto n = *it;
+            auto r = rmap.at(n).translated(-ldelta, 0);
+            rmap[n] = r;
+            const auto &c = n->children;
+            std::for_each(c.cbegin(), c.cend(), std::bind(cfunc, -ldelta, _1));
+
+            if (++it == leftNodes.cend()) {
+                break;
+            }
+
+            const auto &nextr = rmap.at(*it);
+            if (nextr.left() < r.left() && !nextr.intersects(r)) {
+                break;
+            }
+        }
+    }
+
+    if (rdelta > 0) {
+        auto rcomp = [this](MclNode *n1, MclNode *n2) {
+            return rmap.at(n1).x() < rmap.at(n2).x();
+        };
+        std::sort(rightNodes.begin(), rightNodes.end(), rcomp);
+
+        auto it = rightNodes.cbegin();
+        while (true) {
+            auto n = *it;
+            auto r = rmap.at(n).translated(rdelta, 0);
+            rmap[n] = r;
+            const auto &c = n->children;
+            std::for_each(c.cbegin(), c.cend(), std::bind(cfunc, rdelta, _1));
+
+            if (++it == rightNodes.cend()) {
+                break;
+            }
+
+            const auto &nextr = rmap.at(*it);
+            if (nextr.right() > r.right() && !nextr.intersects(r)) {
+                break;
+            }
+        }
+    }
+
+    rmap[node_] = rect;
+    double cx = rect.x() + nodeWidth / 2;
+    double cy = rect.y() + nodeHeight / 2;
+
+    for (const auto &c : children) {
+        pmap[c] = QPointF(cx, cy);
+        cx += nodeWidth + hMargin;
+    }
+
+    const QRectF &lrect = leftNodes.empty() ? rect : rmap.at(leftNodes.back());
+    if (lrect.left() < leftmost.left()) {
+        leftmost = lrect;
+    }
+
+    const QRectF &rrect = rightNodes.empty() ? rect : rmap.at(rightNodes.back());
+    if (rrect.right() > rightmost.right()) {
+        rightmost = rrect;
+    }
+}
+
+double MclWidget::GeometryTraverse::width() const
+{
+    return rightmost.right() - leftmost.left();
+}
+
+double MclWidget::GeometryTraverse::height() const
+{
+    return (depth + 1) * nodeHeight + depth * vMargin;
+}
+
+void MclWidget::GeometryTraverse::translate(double dx, double dy)
+{
+    for (auto &entry : pmap) {
+        entry.second.rx() += dx;
+        entry.second.ry() += dy;
+    }
+
+    for (auto &entry : rmap) {
+        entry.second.translate(dx, dy);
+    }
+}
+
+MclNode *MclWidget::GeometryTraverse::nodeAt(double x, double y)
+{
+    using std::pow;
+
+    for (const auto &entry : pmap) {
+        const QPointF &c = entry.second;
+        double v = pow(2 * (x - c.x()) / nodeWidth, 2) +
+                   pow(2 * (y - c.y()) / nodeHeight, 2);
+        if (v <= 1) {
+            return const_cast<MclNode*>(entry.first);
+        }
+    }
+
+    return nullptr;
+}
+
+MclWidget::PaintTraverse::PaintTraverse(QPainter &p, const MclWidget *w)
+    : painter{p}, widget{w}, tree{w->tree}, pmap{w->gtraverse->pmap}
+{
+}
+
+void MclWidget::PaintTraverse::operator()(const MclNode *node)
+{
+    if (!tree.treeContains(node)) {
+        return;
+    }
+
+    MclNode *node_ = const_cast<MclNode*>(node);
+    const MclNode *hn = widget->hoverNode;
+    bool isDummyChildren = false;
+
+    if (hn != nullptr && hn->children.size() > 0) {
+        for (const auto &c : hn->children) {
+            auto it = tree.uniq.find(c.get());
+            if (*it == node && node != c.get()) {
+                isDummyChildren = true;
+                break;
+            }
+        }
+    }
+
+    const auto &path = widget->path;
+    QString color;
+    if (node == hn) {
+        color = "darkblue";
+    } else if (node == tree.current) {
+        color = "darkred";
+    } else if (isDummyChildren) {
+        color = "darkblue";
+    } else if (std::find(path.cbegin(), path.cend(), node_) != path.cend()) {
+        color = "green";
+    }
+
+    QPen ppen = painter.pen();
+    if (!color.isEmpty()) {
+        QPen pen = ppen;
+        pen.setColor(QColor(color));
+        painter.setPen(pen);
+    }
+
+    const auto &c = node->children;
+    QString rtag;
+    if (c.size() > 0) {
+        auto p = [this](const auto &c) {
+            return !tree.treeContains(c.get());
+        };
+        int dummyChildren = std::count_if(c.cbegin(), c.cend(), p);
+        if (dummyChildren > 0) {
+            QTextStream(&rtag) << "+" << dummyChildren;
+        }
+    }
+
+    paintNode(node, painter, pmap.at(node_), rtag);
+    if (!color.isEmpty()) {
         painter.setPen(ppen);
+    }
+
+    if (node->parent != nullptr) {
+        paintEdge(painter, pmap.at(node_), pmap.at(node->parent));
+    }
+}
+
+MclWidget::MclWidget(QWidget *parent) : QWidget(parent)
+{
+    setMouseTracking(true);
+}
+
+MclWidget::~MclWidget()
+{
+    if (gtraverse != nullptr) {
+        delete gtraverse;
     }
 }
 
 void MclWidget::nextIteration()
 {
-    if (solver.next()) {
-        repaint();
+    if (tree.next()) {
+        updateTree();
     }
 }
 
 void MclWidget::previousIteration()
 {
-    if (solver.previous()) {
-        repaint();
+    if (tree.previous()) {
+        updateTree();
     }
 }
 
-void MclWidget::paintTree(QPainter &painter) const
+void MclWidget::doGeometryTraverse()
 {
-    static int count = 1;
-    static double const nodeWidth = nodeRect.width();
-    static double const nodeHeight = nodeRect.height();
-    static double const dx = nodeWidth + hMargin;
-    static double const dy = nodeHeight + vMargin;
-
-    QSize size = this->size();
-    double width = size.width();
-    double cy = 10 + nodeHeight / 2;
-    MclNode *root = solver.root;
-    MclNode *current = solver.current;
-    std::vector<MclNode*> nodes;
-    std::unordered_map<MclNode*, QPointF> pmap;
-    nodes.push_back(root);
-
-    while (!nodes.empty()) {
-        int ncount = nodes.size();
-        double childrenRectWidth = nodeWidth * ncount + hMargin * (ncount - 1);
-        double cx = (width - childrenRectWidth + nodeWidth) / 2;
- 
-        for (const auto &n : nodes) {
-            QPointF center(cx, cy);
-            paintNode(n, painter, center, n == current);
-            if (n->parent != nullptr) {
-                paintEdge(painter, center, pmap[n->parent]);
-            }
-            pmap[n] = center;
-            cx += dx;
-        }
-
-        cy += dy;
-        decltype(nodes) parents;
-        parents.swap(nodes);
-
-        for (const auto &p : parents) {
-            if (!(p->ccount > 0)) {
-                continue;
-            }
-
-            for (const auto &c : p->children) {
-                if (solver.treeContains(c.get())) {
-                    nodes.push_back(c.get());
-                }
-            }
-        }
+    if (gtraverse != nullptr) {
+        delete gtraverse;
     }
 
-    count++;
+    gtraverse = new GeometryTraverse(tree);
+    tree.traverse(*gtraverse);
+    updateGeometry_();
+}
+
+void MclWidget::updateGeometry_()
+{
+    double minWidth = 0;
+    double minHeight = 0;
+    
+    if (parentWidget() != nullptr) {
+        QSize ps = parentWidget()->size();
+        minWidth = ps.width();
+        minHeight = ps.height();
+    }
+
+    double tw = gtraverse->width();
+    double th = gtraverse->height(); double w = std::max(minWidth, tw + 2 * treeHMargin);
+    double h = std::max(minHeight, th + 2 * treeVMargin);
+    double treeRectLeft = (w - tw) / 2;
+    double dx = treeRectLeft - gtraverse->leftmost.left();
+    double dy = treeVMargin + nodeHeight / 2;
+    gtraverse->translate(dx, dy);
+    setFixedSize(w, h);
+}
+
+void MclWidget::updateTree()
+{
+    doGeometryTraverse();
+    path = tree.pathBetween(tree.root, tree.current);
+    repaint();
+    emit treeUpdate(*gtraverse);
 }
 
 void MclWidget::paintEvent(QPaintEvent *ev)
@@ -152,5 +395,20 @@ void MclWidget::paintEvent(QPaintEvent *ev)
     QPen pen(painter.pen());
     pen.setWidth(2);
     painter.setPen(pen);
-    paintTree(painter);
+    PaintTraverse ptraverse(painter, this);
+    tree.traverse(ptraverse);
+}
+
+void MclWidget::resizeEvent(QResizeEvent *ev)
+{
+    updateTree();
+}
+
+void MclWidget::mouseMoveEvent(QMouseEvent *ev)
+{
+    const MclNode *prev = hoverNode;
+    hoverNode = gtraverse->nodeAt(ev->x(), ev->y());
+    if (hoverNode != prev) {
+        repaint();
+    }
 }

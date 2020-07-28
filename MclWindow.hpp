@@ -3,6 +3,7 @@
 
 #include <QSharedPointer>
 #include <QVBoxLayout>
+#include <QScrollArea>
 #include <QWidget>
 #include <QSvgWidget>
 #include <QPushButton>
@@ -14,8 +15,11 @@ class MclWindow : public QWidget {
     Q_OBJECT
 public:
     explicit MclWindow(QWidget *parent = nullptr);
+private slots:
+    void mclUpdated(const MclWidget::GeometryTraverse &g);
 private:
     QSharedPointer<QVBoxLayout> mainBox;
+    QSharedPointer<QScrollArea> mclScroll;
     QSharedPointer<MclWidget> mcl;
     QSharedPointer<QPushButton> nextItButton;
     QSharedPointer<QPushButton> prevItButton;

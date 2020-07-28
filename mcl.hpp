@@ -4,6 +4,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <deque>
+#include <functional>
 #include <set>
 #include <unordered_set>
 
@@ -28,7 +30,7 @@ private:
     void addChild(int _m, int _c, int _l);
 };
 
-class MclSolver {
+class MclTree {
 private:
     static struct {
         std::size_t operator()(const MclNode *node) const
@@ -63,17 +65,31 @@ private:
         }
     } openCompare;
 
-    static bool isTarget(const MclNode *node);
 public:
-    explicit MclSolver();
+    template<typename... Ts>
+    struct Traverse {
+        virtual ~Traverse() { }
+        virtual void operator()(Ts... args) = 0;
+    };
+
+    using Nodes = std::deque<MclNode*>;
+    using SequentialTraverse = Traverse<const MclNode*>;
+    using LevelTraverse = Traverse<const Nodes&, int>;
+
+    static bool isTarget(const MclNode *node);
+    explicit MclTree();
     bool next();
     bool previous();
     bool treeContains(const MclNode *node) const;
+    Nodes pathBetween(MclNode *a, MclNode *b) const;
+    void traverse(SequentialTraverse &func) const;
+    void traverse(LevelTraverse &func) const;
+
     MclNode *root;
     MclNode *current;
     std::unordered_set<MclNode*, decltype(nodeHash), decltype(nodeEqual)> uniq;
     std::set<MclNode*, decltype(openCompare)> open;
-    std::vector<MclNode*> path;
+    Nodes closed;
 };
 
 #endif
