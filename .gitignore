@@ -106,3 +106,5 @@ compile_commands.json
 
 /latex/*
 !/latex/*.tex
+!/latex/Makefile
+!/latex/.latexmkrc
