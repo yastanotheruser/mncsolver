@@ -2,13 +2,13 @@
 #include <sstream>
 #include <algorithm>
 
-MclNode::MclNode(int _m, int _c, int _l, MclNode *p, int d, int i)
-    : m{_m}, c{_c}, l{_l}, parent{p}, depth{d}, index{i}, ccount{-1}
+MclNode::MclNode(int _m, int _c, int _l, MclNode *p, int d, int i, int o)
+    : m{_m}, c{_c}, l{_l}, parent{p}, depth{d}, index{i}, op{o}, ccount{-1}
 {
 }
 
 MclNode::MclNode(int _m, int _c, int _l)
-    : m{_m}, c{_c}, l{_l}, parent{nullptr}, depth{0}, index{-1}, ccount{-1}
+    : m{_m}, c{_c}, l{_l}, parent{nullptr}, depth{0}, index{-1}, op{-1}, ccount{-1}
 {
 }
 
@@ -21,43 +21,43 @@ int MclNode::iterate()
     ccount = 0;
     if (l == 0) {
         if (m >= 1) {
-            addChild(m - 1, c, 1);
+            addChild(m - 1, c, 1, 0);
         }
 
         if (m >= 2) {
-            addChild(m - 2, c, 1);
+            addChild(m - 2, c, 1, 1);
         }
 
         if (c >= 1) {
-            addChild(m, c - 1, 1);
+            addChild(m, c - 1, 1, 2);
         }
 
         if (c >= 2) {
-            addChild(m, c - 2, 1);
+            addChild(m, c - 2, 1, 3);
         }
 
         if (m >= 1 && c >= 1) {
-            addChild(m - 1, c - 1, 1);
+            addChild(m - 1, c - 1, 1, 4);
         }
    } else if (l == 1) {
         if (m < 3) {
-            addChild(m + 1, c, 0);
+            addChild(m + 1, c, 0, 5);
         }
 
         if (m < 2) {
-            addChild(m + 2, c, 0);
+            addChild(m + 2, c, 0, 6);
         }
 
         if (c < 3) {
-            addChild(m, c + 1, 0);
+            addChild(m, c + 1, 0, 7);
         }
 
         if (c < 2) {
-            addChild(m, c + 2, 0);
+            addChild(m, c + 2, 0, 8);
         }
 
         if (m < 3 && c < 3) {
-            addChild(m + 1, c + 1, 0);
+            addChild(m + 1, c + 1, 0, 9);
         }
     }
 
@@ -81,9 +81,9 @@ MclNode::operator std::string() const
     return os.str();
 };
 
-void MclNode::addChild(int _m, int _c, int _l)
+void MclNode::addChild(int _m, int _c, int _l, int _op)
 {
-    MclNode *child = new MclNode(_m, _c, _l, this, depth + 1, ccount++);
+    MclNode *child = new MclNode(_m, _c, _l, this, depth + 1, ccount++, _op);
     children.push_back(std::unique_ptr<MclNode>(child));
 }
 
@@ -190,9 +190,9 @@ void MclTree::traverse(MclTree::SequentialTraverse &func) const
         current.swap(nodes);
 
         for (const auto &n : current) {
-            const auto &c = n->children;
-            std::for_each(c.cbegin(), c.cend(),
-                          [&nodes](const auto &n) { nodes.push_back(n.get()); });
+            for (const auto &c : n->children) {
+                nodes.push_back(c.get());
+            }
             func(n);
         }
     }

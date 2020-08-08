@@ -8,11 +8,11 @@
 #include <QMouseEvent>
 
 void MclWidget::paintNode(const MclNode *node, QPainter &painter, 
-                          const QPointF &center, QString const rtag)
+                          const QPointF &center, const QString &rtag)
 {
     QString text = QString::fromStdString(*node);
     QString vhText = QString::number(node->vh());
-    QRectF rect = nodeRect;
+    QRectF rect(0, 0, nodeWidth, nodeHeight);
     rect.moveCenter(center);
     painter.drawArc(rect, 0, 16 * 360);
     painter.drawText(rect, Qt::AlignCenter, text);
@@ -35,7 +35,7 @@ void MclWidget::paintNode(const MclNode *node, QPainter &painter,
 }
 
 void MclWidget::paintEdge(QPainter &painter, const QPointF &c1,
-                          const QPointF &c2)
+                          const QPointF &c2, const QString &tag)
 {
     using std::sqrt;
     using std::pow;
@@ -44,23 +44,52 @@ void MclWidget::paintEdge(QPainter &painter, const QPointF &c1,
     double y1 = c1.y();
     double x2 = c2.x();
     double y2 = c2.y();
-    double a = nodeRect.width() / 2;
-    double b = nodeRect.height() / 2;
+    double a = nodeWidth / 2;
+    double b = nodeHeight / 2;
 
-    if (x1 == x2) {
+    double ex1;
+    double ey1;
+    double ex2;
+    double ey2;
+    int slopeSgn;
+
+    if (x1 != x2) {
+        double m = (y2 - y1) / (x2 - x1);
+        int sgn = x1 < x2 ? 1 : -1;
+        double k = a * b / sqrt(pow(a, 2) * pow(m, 2) + pow(b, 2));
+        ex1 = x1 + sgn * k;
+        ey1 = m * (ex1 - x1) + y1;
+        ex2 = x2 - sgn * k;
+        ey2 = m * (ex2 - x2) + y2;
+        slopeSgn = m > 0 ? 1 : -1;
+    } else {
         int sgn = y1 < y2 ? 1 : -1;
-        painter.drawLine(QPointF(x1, y1 + sgn * b), QPointF(x2, y2 - sgn * b));
+        ex1 = x1;
+        ey1 = y1 + sgn * b;
+        ex2 = x2;
+        ey2 = y2 - sgn * b;
+        slopeSgn = 0;
+    }
+
+    QLineF line(ex1, ey1, ex2, ey2);
+    painter.drawLine(line);
+
+    if (tag.length() == 0) {
         return;
     }
 
-    double m = (y2 - y1) / (x2 - x1);
-    int sgn = x1 < x2 ? 1 : -1;
-    double k = a * b / sqrt(pow(a, 2) * pow(m, 2) + pow(b, 2));
-    double ex1 = x1 + sgn * k;
-    double ey1 = m * (ex1 - x1) + y1;
-    double ex2 = x2 - sgn * k;
-    double ey2 = m * (ex2 - x2) + y2;
-    painter.drawLine(QPointF(ex1, ey1), QPointF(ex2, ey2));
+    QSizeF tsize(painter.fontMetrics().size(0, tag));
+    QRectF tagRect(QPointF(), tsize);
+
+    if (slopeSgn < 0) {
+        tagRect.moveBottomRight(line.center());
+        tagRect.translate(-10.0, 0);
+    } else {
+        tagRect.moveBottomLeft(line.center());
+        tagRect.translate(10.0, 0);
+    }
+
+    painter.drawText(tagRect, Qt::AlignCenter, tag);
 }
 
 MclWidget::GeometryTraverse::GeometryTraverse(const MclTree &t)
@@ -68,7 +97,7 @@ MclWidget::GeometryTraverse::GeometryTraverse(const MclTree &t)
 {
     QPointF nullPoint;
     pmap[tree.root] = nullPoint;
-    QRectF rect = nodeRect;
+    QRectF rect(0, 0, nodeWidth, nodeHeight);
     rect.moveCenter(nullPoint);
     leftmost = rect;
     rightmost = rect;
@@ -304,7 +333,7 @@ void MclWidget::PaintTraverse::operator()(const MclNode *node)
     const auto &c = node->children;
     QString rtag;
     if (c.size() > 0) {
-        auto p = [this](const auto &c) {
+        auto p = [this](const std::unique_ptr<MclNode> &c) {
             return !tree.treeContains(c.get());
         };
         int dummyChildren = std::count_if(c.cbegin(), c.cend(), p);
@@ -319,7 +348,8 @@ void MclWidget::PaintTraverse::operator()(const MclNode *node)
     }
 
     if (node->parent != nullptr) {
-        paintEdge(painter, pmap.at(node_), pmap.at(node->parent));
+        QString tag('A' + node->op);
+        paintEdge(painter, pmap.at(node_), pmap.at(node->parent), tag);
     }
 }
 

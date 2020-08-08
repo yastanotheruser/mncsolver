@@ -72,6 +72,5 @@ void LabelRow::initLayout()
         layout->addWidget(w.get());
     }
 
-    layout->addStretch();
     setLayout(layout);
 }

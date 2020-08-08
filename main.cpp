@@ -24,7 +24,7 @@ MclWindow *initMainWindow()
 {
     MclWindow *window = new MclWindow();
     window->setWindowTitle(QCoreApplication::applicationName());
-    window->setFixedSize(1080, 640);
+    window->setFixedSize(1280, 640);
     window->setFocusPolicy(Qt::ClickFocus);
     return window;
 }

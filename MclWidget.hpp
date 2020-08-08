@@ -39,16 +39,15 @@ public slots:
 private:
     static constexpr double const nodeWidth = 80.0;
     static constexpr double const nodeHeight = 40.0;
-    static constexpr QRectF const nodeRect = QRectF(0, 0, nodeWidth, nodeHeight);
     static constexpr double const hMargin = 60.0;
     static constexpr double const vMargin = 40.0;
     static constexpr double const treeHMargin = 50;
     static constexpr double const treeVMargin = 50;
 
     static void paintNode(const MclNode *node, QPainter &painter,
-                          const QPointF &center, QString const rtag = QString());
+                          const QPointF &center, const QString &rtag = QString());
     static void paintEdge(QPainter &painter, const QPointF &c1,
-                          const QPointF &c2);
+                          const QPointF &c2, const QString &tag = QString());
 
     struct PaintTraverse : MclTree::SequentialTraverse {
         explicit PaintTraverse(QPainter &p, const MclWidget *w);

@@ -1,7 +1,6 @@
 #ifndef MCLWINDOW_HPP
 #define MCLWINDOW_HPP
 
-#include <QSharedPointer>
 #include <QVBoxLayout>
 #include <QScrollArea>
 #include <QWidget>
@@ -18,16 +17,15 @@ public:
 private slots:
     void mclUpdated(const MclWidget::GeometryTraverse &g);
 private:
-    QSharedPointer<QVBoxLayout> mainBox;
-    QSharedPointer<QScrollArea> mclScroll;
-    QSharedPointer<MclWidget> mcl;
-    QSharedPointer<QPushButton> nextItButton;
-    QSharedPointer<QPushButton> prevItButton;
+    QHBoxLayout *mainBox;
+    QScrollArea *mclScroll;
+    MclWidget *mcl;
+    QPushButton *nextItButton;
+    QPushButton *prevItButton;
     void initWindow();
     void initLayout();
     void addWidgets();
     void addInfoWidgets();
-    void addButtons();
     void initSignals();
 };
 

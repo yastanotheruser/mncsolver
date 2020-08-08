@@ -27,68 +27,120 @@ void MclWindow::initWindow()
 
 void MclWindow::initLayout()
 {
-    mainBox = QSharedPointer<QVBoxLayout>(new QVBoxLayout());
-    mainBox->setAlignment(Qt::AlignTop);
-    setLayout(mainBox.get());
+    mainBox = new QHBoxLayout();
+    mainBox->setAlignment(Qt::AlignLeft);
+    setLayout(mainBox);
 }
 
 void MclWindow::addWidgets()
 {
     addInfoWidgets();
-    addButtons();
-    mclScroll = QSharedPointer<QScrollArea>(new QScrollArea());
-    mcl = QSharedPointer<MclWidget>(new MclWidget());
-    mclScroll->setWidget(mcl.get());
-    mainBox->addWidget(mclScroll.get(), 1);
+    QVBoxLayout *rightLayout = new QVBoxLayout();
+    QHBoxLayout *hbox = new QHBoxLayout();
+    nextItButton = new QPushButton("Siguiente ➡️");
+    prevItButton = new QPushButton("⬅️ Anterior");
+    nextItButton->setFocusPolicy(Qt::ClickFocus);
+    prevItButton->setFocusPolicy(Qt::ClickFocus);
+    hbox->addWidget(prevItButton);
+    hbox->addWidget(nextItButton);
+    rightLayout->addLayout(hbox);
+
+    mclScroll = new QScrollArea();
+    mcl = new MclWidget();
+    mclScroll->setWidget(mcl);
+    rightLayout->addWidget(mclScroll, 1);
+    mainBox->addLayout(rightLayout);
 }
 
 void MclWindow::addInfoWidgets()
 {
-    mainBox->addWidget(new LabelRow({
+    QVBoxLayout *infoLayout = new QVBoxLayout();
+    infoLayout->setSpacing(0);
+
+    infoLayout->addWidget(new LabelRow({
         "Espacio de estados:",
-        QVariant::fromValue(new QSvgWidget("latex/latex1.svg")),
-        4,
+        QVariant::fromValue(new QSvgWidget("latex/latex1.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
         "Estado inicial:",
-        QVariant::fromValue(new QSvgWidget("latex/latex2.svg")),
-        4,
+        QVariant::fromValue(new QSvgWidget("latex/latex2.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
         "Estado objetivo:",
         QVariant::fromValue(new QSvgWidget("latex/latex3.svg"))
     }), 0, Qt::AlignHCenter);
 
-    mainBox->addWidget(new LabelRow({
+    infoLayout->addWidget(new LabelRow({
         QVariant::fromValue(new QSvgWidget("latex/latex4.svg")),
         ": Cantidad de misioneros al lado izquierdo del río",
     }), 0, Qt::AlignHCenter);
 
-    mainBox->addWidget(new LabelRow({
+    infoLayout->addWidget(new LabelRow({
         QVariant::fromValue(new QSvgWidget("latex/latex5.svg")),
         ": Cantidad de caníbales al lado izquierdo del río",
     }), 0, Qt::AlignHCenter);
 
-    mainBox->addWidget(new LabelRow({
+    infoLayout->addWidget(new LabelRow({
         QVariant::fromValue(new QSvgWidget("latex/latex6.svg")),
         ": Posición de la lancha",
     }), 0, Qt::AlignHCenter);
-}
 
-void MclWindow::addButtons()
-{
-    QHBoxLayout *hbox = new QHBoxLayout();
-    nextItButton = QSharedPointer<QPushButton>(new QPushButton("Siguiente ➡️"));
-    prevItButton = QSharedPointer<QPushButton>(new QPushButton("⬅️ Anterior"));
-    nextItButton->setFocusPolicy(Qt::ClickFocus);
-    prevItButton->setFocusPolicy(Qt::ClickFocus);
-    hbox->addWidget(prevItButton.get());
-    hbox->addWidget(nextItButton.get());
-    mainBox->addLayout(hbox);
+    infoLayout->addSpacing(20);
+    infoLayout->addWidget(new QLabel("Operadores"), 0, Qt::AlignHCenter);
+    infoLayout->addSpacing(10);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex7.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex8.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex9.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex10.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex11.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex12.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex13.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex14.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex15.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addWidget(new LabelRow({
+        QVariant::fromValue(new QSvgWidget("latex/latex16.svg"))
+    }), 0, Qt::AlignHCenter);
+
+    infoLayout->addStretch();
+    mainBox->addLayout(infoLayout);
 }
 
 void MclWindow::initSignals()
 {
-    connect(nextItButton.get(), SIGNAL(clicked()), mcl.get(),
+    connect(nextItButton, SIGNAL(clicked()), mcl,
             SLOT(nextIteration()));
-    connect(prevItButton.get(), SIGNAL(clicked()), mcl.get(),
+    connect(prevItButton, SIGNAL(clicked()), mcl,
             SLOT(previousIteration()));
-    connect(mcl.get(), SIGNAL(treeUpdate(const MclWidget::GeometryTraverse&)),
+    connect(mcl, SIGNAL(treeUpdate(const MclWidget::GeometryTraverse&)),
             this, SLOT(mclUpdated(const MclWidget::GeometryTraverse&)));
 }

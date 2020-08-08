@@ -11,7 +11,7 @@
 
 class MclNode {
 public:
-    explicit MclNode(int _m, int _c, int _l, MclNode *p, int d, int i);
+    explicit MclNode(int _m, int _c, int _l, MclNode *p, int d, int i, int o = -1);
     explicit MclNode(int _m, int _c, int _l);
     operator std::string() const;
     constexpr int vh() const { return 6 - 2 * m - 2 * c - 1000 * (m != c); }
@@ -24,10 +24,11 @@ public:
     MclNode *parent;
     int depth;
     int index;
+    int op;
     int ccount;
     std::vector<std::unique_ptr<MclNode>> children;
 private:
-    void addChild(int _m, int _c, int _l);
+    void addChild(int _m, int _c, int _l, int _op = -1);
 };
 
 class MclTree {
